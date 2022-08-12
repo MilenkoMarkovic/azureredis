@@ -1,0 +1,51 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: anaflixtube.azurecr.io
+        username: ${{ secrets.acr_anaflixtube_username }}
+        password: ${{ secrets.acr_anaflixtube_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/azure-vote" -f  "azure-vote/Dockerfile" -t anaflixtube.azurecr.io/mycluster:${{ github.sha }} --label dockerfile-path=azure-vote/Dockerfile
+        docker push anaflixtube.azurecr.io/mycluster:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_mycluster_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep mycluster8511 | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace mycluster8511`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: mycluster8511
+        container-registry-url: anaflixtube.azurecr.io
+        container-registry-username: ${{ secrets.acr_anaflixtube_username }}
+        container-registry-password: ${{ secrets.acr_anaflixtube_password }}
+        secret-name: myclusterdockerauth
+       
+    - uses: azure/k8s-deploy@v1.2
+      with:
+        namespace: mycluster8511
+        manifests: |
+          manifests/deployment.yml
+          manifests/service.yml
+          manifests/ingress.yml
+        images: |
+          anaflixtube.azurecr.io/mycluster:${{ github.sha }}
+        imagepullsecrets: |
+          myclusterdockerauth
