@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: "mycluster-e9e5"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "mycluster-e9e5"
+  template:
+    metadata:
+      labels:
+        app: "mycluster-e9e5"
+    spec:
+      containers:
+        - name: "mycluster-e9e5"
+          image: "anaflixtube.azurecr.io/mycluster"
+          ports:
+          - containerPort: 80
